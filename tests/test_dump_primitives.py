@@ -18,9 +18,13 @@ from strufi.dump_primitives import (
     dump_key,
     dump_list,
     dump_parameters,
+    dump_token,
+    dump_simple_string,
+    dump_display_string,
     dump_string,
 )
 from strufi.exceptions import DumpError
+from strufi.types import Token, SimpleString, DisplayString
 
 
 def check_dump_function(dump_func, value, expected):
@@ -83,6 +87,70 @@ def test_dump_decimal(value, expected):
 )
 def test_dump_decimal_error(value, error_message):
     check_dump_function_error(dump_decimal, value, error_message)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("foo", "foo"),
+        ("FOO", "FOO"),
+        ("*a+123", "*a+123"),
+    ],
+)
+def test_dump_token(value, expected):
+    check_dump_function(dump_token, value, expected)
+
+
+@pytest.mark.parametrize(
+    "value,error_message",
+    [
+        ("", "Token cannot be empty"),
+        ("123", "Token must start with letter or '*', not '1'"),
+        ("foo bar", "Token cannot contain character ' '"),
+        ("foo\nbar", "Token cannot contain character '\\n'"),
+        ('foo"bar', "Token cannot contain character '\"'"),
+        ("tête", "Token cannot contain character 'ê'"),
+    ],
+)
+def test_dump_token_error(value, error_message):
+    check_dump_function_error(dump_token, value, error_message)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("", '""'),
+        ("foo bar", '"foo bar"'),
+        (r'foo\n"bar"', r'"foo\\n\"bar\""'),
+    ],
+)
+def test_dump_simple_string(value, expected):
+    check_dump_function(dump_simple_string, value, expected)
+
+
+@pytest.mark.parametrize(
+    "value,error_message",
+    [
+        ("foo\nbar", "Non-ascii or non-printable characters are not allowed in simple strings"),
+        ('"tête%"', "Non-ascii or non-printable characters are not allowed in simple strings"),
+    ],
+)
+def test_dump_simple_string_error(value, error_message):
+    check_dump_function_error(dump_simple_string, value, error_message)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("", '%""'),
+        ("foo bar", '%"foo bar"'),
+        (r'foo\n"bar"', r'%"foo\n%22bar%22"'),
+        ("foo\nbar", '%"foo%0abar"'),
+        ('"tête%"', '%"%22t%c3%aate%25%22"'),
+    ],
+)
+def test_dump_display_string(value, expected):
+    check_dump_function(dump_display_string, value, expected)
 
 
 @pytest.mark.parametrize(
@@ -151,6 +219,10 @@ def test_dump_date_error():
         (1, "1"),
         (1.0, "1.0"),
         ("foo", '"foo"'),
+        ("tête", '%"t%c3%aate"'),
+        (Token("foo"), "foo"),
+        (SimpleString("foo"), '"foo"'),
+        (DisplayString("foo"), '%"foo"'),
         (b"test", ":dGVzdA==:"),
         (datetime(1970, 1, 1, tzinfo=UTC), "@0"),
     ],

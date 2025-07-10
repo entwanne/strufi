@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import cast
 
 from .exceptions import DumpError
-from .load_primitives import KEY_CHARS, KEY_START_CHARS, STRING_CHARS
-from .types import BareItem, Item, ItemList, Parameters
+from .load_primitives import KEY_CHARS, KEY_START_CHARS, STRING_CHARS, TOKEN_START_CHARS, TOKEN_CHARS
+from .types import BareItem, Item, ItemList, Parameters, SimpleString, Token, DisplayString
 
 
 def dump_integer(value: int) -> Generator[str]:
@@ -24,7 +24,45 @@ def dump_decimal(value: float) -> Generator[str]:
         yield "0"
 
 
-def _dump_display_string(value: str) -> Generator[str]:
+def _check_simple_string(value: str) -> bool:
+    try:
+        value.encode("ascii").decode("utf-8")
+    except ValueError:
+        return False
+
+    if any(c not in STRING_CHARS for c in value):
+        return False
+
+    return True
+
+
+def dump_simple_string(value: str, check: bool = True) -> Generator[str]:
+    if check and not _check_simple_string(value):
+        raise DumpError("Non-ascii or non-printable characters are not allowed in simple strings")
+
+    yield '"'
+
+    for char in value:
+        if char in '"\\':
+            yield "\\"
+        yield char
+
+    yield '"'
+
+
+def dump_token(value: str) -> Generator[str]:
+    if not value:
+        raise DumpError("Token cannot be empty")
+    if value[0] not in TOKEN_START_CHARS:
+        raise DumpError(f"Token must start with letter or '*', not {value[0]!r}")
+    for char in value[1:]:
+        if char not in TOKEN_CHARS:
+            raise DumpError(f"Token cannot contain character {char!r}")
+
+    yield value
+
+
+def dump_display_string(value: str) -> Generator[str]:
     raw_data = value.encode("utf-8")
     yield '%"'
 
@@ -39,24 +77,10 @@ def _dump_display_string(value: str) -> Generator[str]:
 
 
 def dump_string(value: str) -> Generator[str]:
-    try:
-        value = value.encode("ascii").decode("utf-8")
-    except ValueError:
-        yield from _dump_display_string(value)
-        return
-
-    if any(c not in STRING_CHARS for c in value):
-        yield from _dump_display_string(value)
-        return
-
-    yield '"'
-
-    for char in value:
-        if char in '"\\':
-            yield "\\"
-        yield char
-
-    yield '"'
+    if _check_simple_string(value):
+        return dump_simple_string(value, check=False)
+    else:
+        return dump_display_string(value)
 
 
 def dump_bytes(value: bytes) -> Generator[str]:
@@ -88,6 +112,12 @@ def dump_bare_item(value: BareItem) -> Generator[str]:
             return dump_integer(value)
         case float():
             return dump_decimal(value)
+        case Token():
+            return dump_token(value)
+        case SimpleString():
+            return dump_simple_string(value)
+        case DisplayString():
+            return dump_display_string(value)
         case str():
             return dump_string(value)
         case bytes():

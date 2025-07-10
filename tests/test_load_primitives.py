@@ -23,6 +23,7 @@ from strufi.load_primitives import (
     load_token,
 )
 from strufi.reader import Reader
+from strufi.types import Token, SimpleString, DisplayString, Key
 
 
 def check_load_function(load_func, input_data, expected, remaining_data=""):
@@ -122,7 +123,9 @@ def test_load_number_error(input_data, exc_type, error_message):
     ],
 )
 def test_load_string(input_data, result, remaining_data):
-    check_load_function(load_string, input_data, result, remaining_data)
+    value = check_load_function(load_string, input_data, result, remaining_data)
+    assert isinstance(value, str)
+    assert type(value) is SimpleString
 
 
 @pytest.mark.parametrize(
@@ -159,7 +162,9 @@ def test_load_string_error(input_data, exc_type, error_message):
     ],
 )
 def test_load_token(input_data, result, remaining_data):
-    check_load_function(load_token, input_data, result, remaining_data)
+    value = check_load_function(load_token, input_data, result, remaining_data)
+    assert isinstance(value, str)
+    assert type(value) is Token
 
 
 @pytest.mark.parametrize("input_data", ["+foo", ""])
@@ -271,10 +276,13 @@ def test_load_date_error(input_data, exc_type, error_message):
             "",
         ),
         ('%"abc\\"', "abc\\", ""),
+        (r'%"abc\n"', r"abc\n", ""),
     ],
 )
 def test_load_display_string(input_data, result, remaining_data):
-    check_load_function(load_display_string, input_data, result, remaining_data)
+    value = check_load_function(load_display_string, input_data, result, remaining_data)
+    assert isinstance(value, str)
+    assert type(value) is DisplayString
 
 
 @pytest.mark.parametrize(
@@ -342,7 +350,9 @@ def test_load_bare_item_error():
     ],
 )
 def test_load_key(input_data, result, remaining_data):
-    check_load_function(load_key, input_data, result, remaining_data)
+    value = check_load_function(load_key, input_data, result, remaining_data)
+    assert isinstance(value, str)
+    assert type(value) is Key
 
 
 @pytest.mark.parametrize(

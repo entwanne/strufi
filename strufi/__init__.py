@@ -8,7 +8,7 @@ from collections.abc import Callable, Iterable
 from . import dump_primitives, load_primitives
 from .exceptions import DumpError, LoadError, _ContinueLoading
 from .reader import Reader
-from .types import Item, ItemList
+from .types import Item, ItemList, Key
 
 
 def _wrap_load[T](load_func: Callable[[Reader], T], data: str, strict: bool) -> T:
@@ -43,7 +43,7 @@ def load_list(data: str, strict: bool = True) -> list[Item | ItemList]:
     return _wrap_load(load_primitives.load_list, data, strict)
 
 
-def load_dict(data: str, strict: bool = True) -> dict[str, Item | ItemList]:
+def load_dict(data: str, strict: bool = True) -> dict[Key, Item | ItemList]:
     "Load data as an HTTP structured dictionnary, raise LoadError in case of invalid input"
     return _wrap_load(load_primitives.load_dict, data, strict)
 
@@ -62,7 +62,7 @@ def dump_list(item: list[Item | ItemList]) -> str:
     return _wrap_dump(dump_primitives.dump_list, item)
 
 
-def dump_dict(item: dict[str, Item | ItemList]) -> str:
+def dump_dict(item: dict[str | Key, Item | ItemList]) -> str:
     "Dump a dict as an HTTP structured dictionnary, raise DumpError in case of invalid value"
     return _wrap_dump(dump_primitives.dump_dict, item)
 

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from .exceptions import _ContinueLoading
 from .reader import Reader
-from .types import BareItem, Item, ItemList, Parameters
+from .types import BareItem, Item, ItemList, Parameters, SimpleString, Token, DisplayString, Key
 
 
 def discard_whitespaces(reader: Reader) -> None:
@@ -51,7 +51,7 @@ def load_number(reader: Reader) -> int | float:
 STRING_CHARS = frozenset(chr(i) for i in range(0x20, 0x7E + 1))
 
 
-def load_string(reader: Reader) -> str:
+def load_string(reader: Reader) -> SimpleString:
     reader.validate('"')
 
     content: list[str] = []
@@ -59,7 +59,7 @@ def load_string(reader: Reader) -> str:
     while reader:
         match reader.pop():
             case '"':
-                return "".join(content)
+                return SimpleString("".join(content))
             case "\\":
                 content.append(reader.expect({'"', "\\"}))
             case char if char in STRING_CHARS:
@@ -74,7 +74,7 @@ TOKEN_START_CHARS = frozenset(string.ascii_letters) | {"*"}
 TOKEN_CHARS = frozenset("!#$%&'*+-.^_`|~:/") | set(string.digits) | set(string.ascii_letters)
 
 
-def load_token(reader: Reader) -> str:
+def load_token(reader: Reader) -> Token:
     content = [reader.validate(TOKEN_START_CHARS)]
 
     # should also allow unicode characters according to RFC9110
@@ -82,7 +82,7 @@ def load_token(reader: Reader) -> str:
     while char := reader.check(TOKEN_CHARS):
         content.append(char)
 
-    return "".join(content)
+    return Token("".join(content))
 
 
 BYTES_CHARS = frozenset(string.ascii_letters) | set(string.digits) | set("+/=")
@@ -129,7 +129,7 @@ def load_date(reader: Reader) -> datetime:
     return datetime.fromtimestamp(value, UTC)
 
 
-def load_display_string(reader: Reader) -> str:
+def load_display_string(reader: Reader) -> DisplayString:
     reader.validate("%")
     reader.expect('"')
     content = bytearray()
@@ -138,7 +138,7 @@ def load_display_string(reader: Reader) -> str:
         match reader.pop():
             case '"':
                 try:
-                    return content.decode("utf-8")
+                    return DisplayString(content.decode("utf-8"))
                 except ValueError as e:
                     raise reader.load_error(f"cannot decode string: {e}", actual='"') from e
             case "%":
@@ -182,17 +182,17 @@ KEY_START_CHARS = frozenset(string.ascii_lowercase) | {"*"}
 KEY_CHARS = KEY_START_CHARS | set(string.digits) | {"_", "-", "."}
 
 
-def load_key(reader: Reader) -> str:
+def load_key(reader: Reader) -> Key:
     key = [reader.validate(KEY_START_CHARS)]
 
     while char := reader.check(KEY_CHARS):
         key.append(char)
 
-    return "".join(key)
+    return Key("".join(key))
 
 
 def load_parameters(reader: Reader) -> Parameters:
-    parameters = {}
+    parameters: Parameters = {}
 
     while reader:
         if not reader.check(";"):
@@ -272,7 +272,7 @@ def load_list(reader: Reader) -> list[Item | ItemList]:
     return values
 
 
-def load_dict(reader: Reader) -> dict[str, Item | ItemList]:
+def load_dict(reader: Reader) -> dict[Key, Item | ItemList]:
     mapping = {}
 
     while reader:
