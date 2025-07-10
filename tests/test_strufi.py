@@ -9,9 +9,15 @@ from strufi import (
     dump_dict,
     dump_item,
     dump_list,
+    dump_simple_dict,
+    dump_simple_item,
+    dump_simple_list,
     load_dict,
     load_item,
     load_list,
+    load_simple_dict,
+    load_simple_item,
+    load_simple_list,
 )
 
 
@@ -41,9 +47,10 @@ def test_load_item(input_data, result):
         ("(30)", "unexpected character '(' at line 1 colum 0"),
     ],
 )
-def test_load_item_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_item, load_simple_item])
+def test_load_item_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_item(input_data)
+        load_func(input_data)
 
     assert str(e.value) == error_message
 
@@ -66,11 +73,39 @@ def test_load_item_permissive(input_data, result):
         ("+30", "unexpected character '+' at line 1 colum 0"),
     ],
 )
-def test_load_item_permissive_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_item, load_simple_item])
+def test_load_item_permissive_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_item(input_data, strict=False)
+        load_func(input_data, strict=False)
 
     assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        ("123.456", 123.456),
+        ('"foobar"; foo=1;test="bar"', "foobar"),
+        ("*token", "*token"),
+        (":dGVzdA==:", b"test"),
+        ("?1", True),
+        ("@0", datetime(1970, 1, 1, 0, 0, 0, tzinfo=UTC)),
+        ('%"50%e2%82%AC"', "50€"),
+    ],
+)
+def test_load_simple_item(input_data, result):
+    assert load_simple_item(input_data) == result
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        ('"foobar"; foo=1;test="bar"', "foobar"),
+        ("123 456", 123),
+    ],
+)
+def test_load_simple_item_permissive(input_data, result):
+    assert load_simple_item(input_data, strict=False) == result
 
 
 @pytest.mark.parametrize(
@@ -98,9 +133,10 @@ def test_load_list(input_data, result):
         ('%"fée"', "'ascii' codec can't decode byte 0xc3 in position 3: ordinal not in range(128)"),
     ],
 )
-def test_load_list_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_list, load_simple_list])
+def test_load_list_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_list(input_data)
+        load_func(input_data)
 
     assert str(e.value) == error_message
 
@@ -123,11 +159,36 @@ def test_load_list_permissive(input_data, result):
         ("123;456", "unexpected character '4' at line 1 colum 4, expected a key"),
     ],
 )
-def test_load_list_permissive_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_list, load_simple_list])
+def test_load_list_permissive_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_list(input_data, strict=False)
+        load_func(input_data, strict=False)
 
     assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        ("123; foo=456", [123]),
+        ('123 , ("test" "foo"), token  ', [123, ["test", "foo"], "token"]),
+        ("", []),
+        (" \t\n", []),
+    ],
+)
+def test_load_simple_list(input_data, result):
+    assert load_simple_list(input_data) == result
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        ('123 , ("test" "foo"), token  ', [123, ["test", "foo"], "token"]),
+        ("123 456", [123]),
+    ],
+)
+def test_load_simple_list_permissive(input_data, result):
+    assert load_simple_list(input_data, strict=False) == result
 
 
 @pytest.mark.parametrize(
@@ -176,9 +237,10 @@ def test_load_dict_permissive(input_data, result):
         ('key=%"fée"', "'ascii' codec can't decode byte 0xc3 in position 7: ordinal not in range(128)"),
     ],
 )
-def test_load_dict_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_dict, load_simple_dict])
+def test_load_dict_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_dict(input_data)
+        load_func(input_data)
 
     assert str(e.value) == error_message
 
@@ -191,11 +253,44 @@ def test_load_dict_error(input_data, error_message):
         ("key1=123;456", "unexpected character '4' at line 1 colum 9, expected a key"),
     ],
 )
-def test_load_dict_permissive_error(input_data, error_message):
+@pytest.mark.parametrize("load_func", [load_dict, load_simple_dict])
+def test_load_dict_permissive_error(load_func, input_data, error_message):
     with pytest.raises(LoadError) as e:
-        load_dict(input_data, strict=False)
+        load_func(input_data, strict=False)
 
     assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        ("key1=123", {"key1": 123}),
+        ("key1=123; foo=456, key2;bar=0", {"key1": 123, "key2": True}),
+        (
+            'num=123 , *args=("test" "foo"), comment=token  ',
+            {"num": 123, "*args": ["test", "foo"], "comment": "token"},
+        ),
+        ("", {}),
+        (" \t\n", {}),
+    ],
+)
+def test_load_simple_dict(input_data, result):
+    assert load_simple_dict(input_data) == result
+
+
+@pytest.mark.parametrize(
+    "input_data,result",
+    [
+        (
+            'num=123 , *args=("test" "foo"), comment=token  ',
+            {"num": 123, "*args": ["test", "foo"], "comment": "token"},
+        ),
+        ("key=123 456", {"key": 123}),
+        ("kEY=123", {"k": True}),
+    ],
+)
+def test_load_simple_dict_permissive(input_data, result):
+    assert load_simple_dict(input_data, strict=False) == result
 
 
 @pytest.mark.parametrize(
@@ -221,6 +316,30 @@ def test_dump_item(value, expected):
 def test_dump_item_error(value, error_message):
     with pytest.raises(DumpError) as e:
         dump_item(value)
+
+    assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (True, "?1"),
+        (1, "1"),
+        (b"test", ":dGVzdA==:"),
+        ([42, "test"], '(42 "test")'),
+    ],
+)
+def test_dump_simple_item(value, expected):
+    assert dump_simple_item(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value,error_message",
+    [(10**15, "Integer 1000000000000000 is out of bounds")],
+)
+def test_dump_simple_item_error(value, error_message):
+    with pytest.raises(DumpError) as e:
+        dump_simple_item(value)
 
     assert str(e.value) == error_message
 
@@ -255,6 +374,29 @@ def test_dump_list_error(value, error_message):
 @pytest.mark.parametrize(
     "value,expected",
     [
+        ([], ""),
+        ([123], "123"),
+        ([123, ["test", "foo"]], '123, ("test" "foo")'),
+    ],
+)
+def test_dump_simple_list(value, expected):
+    assert dump_simple_list(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value,error_message",
+    [([math.nan], "Decimal nan is out of bounds")],
+)
+def test_dump_simple_list_error(value, error_message):
+    with pytest.raises(DumpError) as e:
+        dump_simple_list(value)
+
+    assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
         ({}, ""),
         ({"key1": (123, {})}, "key1=123"),
         (
@@ -280,5 +422,31 @@ def test_dump_dict(value, expected):
 def test_dump_dict_error(value, error_message):
     with pytest.raises(DumpError) as e:
         dump_dict(value)
+
+    assert str(e.value) == error_message
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ({}, ""),
+        ({"key1": 123}, "key1=123"),
+        (
+            {"num": 123, "*args": ["test", "foo"]},
+            'num=123, *args=("test" "foo")',
+        ),
+    ],
+)
+def test_dump_simple_dict(value, expected):
+    assert dump_simple_dict(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value,error_message",
+    [({"": 0}, "Key cannot ben empty")],
+)
+def test_dump_simple_dict_error(value, error_message):
+    with pytest.raises(DumpError) as e:
+        dump_simple_dict(value)
 
     assert str(e.value) == error_message
